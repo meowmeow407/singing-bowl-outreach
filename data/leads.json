@@ -1,0 +1,22 @@
+[
+  {
+    "id": "lead_1779552555371_1",
+    "company_name": "Zen Harmony Studio",
+    "contact_name": "Priya Sharma",
+    "email": "info@example-yoga.com",
+    "phone": "",
+    "source": "Google Maps",
+    "notes": "yoga studio retail",
+    "created_at": "2026-05-23T16:09:15.371Z"
+  },
+  {
+    "id": "lead_1779552555371_2",
+    "company_name": "Sacred Sound Shop",
+    "contact_name": "John Lee",
+    "email": "contact@example-wellness.com",
+    "phone": "",
+    "source": "Website",
+    "notes": "wholesale interest",
+    "created_at": "2026-05-23T16:09:15.371Z"
+  }
+]
