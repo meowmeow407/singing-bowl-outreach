@@ -2,12 +2,15 @@ const express = require('express');
 const gmailAuth = require('../services/gmailAuth');
 
 const router = express.Router();
-function getAppUrl() {
-  return (
-    process.env.PUBLIC_URL ||
-    process.env.FRONTEND_URL ||
-    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001')
-  );
+function getAppUrl(req) {
+  const configured = process.env.PUBLIC_URL || process.env.FRONTEND_URL;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${proto}://${host}`;
+  }
+  return 'http://localhost:3001';
 }
 
 router.get('/google', (req, res) => {
@@ -25,17 +28,17 @@ router.get('/google', (req, res) => {
 router.get('/google/callback', async (req, res) => {
   const { code, error } = req.query;
   if (error) {
-    return res.redirect(`${getAppUrl()}?gmail=error&message=${encodeURIComponent(error)}`);
+    return res.redirect(`${getAppUrl(req)}?gmail=error&message=${encodeURIComponent(error)}`);
   }
   if (!code) {
-    return res.redirect(`${getAppUrl()}?gmail=error&message=missing_code`);
+    return res.redirect(`${getAppUrl(req)}?gmail=error&message=missing_code`);
   }
   try {
     await gmailAuth.handleCallback(code);
-    res.redirect(`${getAppUrl()}?gmail=connected`);
+    res.redirect(`${getAppUrl(req)}?gmail=connected`);
   } catch (e) {
     console.error('OAuth callback error:', e);
-    res.redirect(`${getAppUrl()}?gmail=error&message=${encodeURIComponent(e.message)}`);
+    res.redirect(`${getAppUrl(req)}?gmail=error&message=${encodeURIComponent(e.message)}`);
   }
 });
 
