@@ -7,7 +7,9 @@
     "phone": "",
     "source": "Google Maps",
     "notes": "yoga studio retail",
-    "created_at": "2026-05-23T16:09:15.371Z"
+    "created_at": "2026-05-23T16:09:15.371Z",
+    "email_status": "sent",
+    "last_emailed_at": "2026-05-27T14:37:11.615Z"
   },
   {
     "id": "lead_1779552555371_2",
@@ -17,6 +19,20 @@
     "phone": "",
     "source": "Website",
     "notes": "wholesale interest",
-    "created_at": "2026-05-23T16:09:15.371Z"
+    "created_at": "2026-05-23T16:09:15.371Z",
+    "email_status": "sent",
+    "last_emailed_at": "2026-05-27T14:37:16.819Z"
+  },
+  {
+    "id": "lead_1779892408704_3",
+    "company_name": "Test Lead 1",
+    "contact_name": "Shyam",
+    "email": "kshyam0722@gmail.com",
+    "phone": "",
+    "source": "Test",
+    "notes": "day4 test",
+    "created_at": "2026-05-27T14:33:28.704Z",
+    "email_status": "sent",
+    "last_emailed_at": "2026-05-27T14:36:44.171Z"
   }
 ]

@@ -1,14 +1,24 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const multer = require('multer');
+const gmailAuthRoutes = require('./routes/gmailAuth');
+const emailRoutes = require('./routes/email');
 
 const app = express();
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
 const LEADS_FILE = path.join(__dirname, '..', 'data', 'leads.json');
+const isProd = process.env.NODE_ENV === 'production';
+const FRONTEND_DIST = path.join(__dirname, '..', 'frontend', 'dist');
 
-app.use(cors());
+app.use(
+  cors({
+    origin: isProd
+      ? process.env.PUBLIC_URL || process.env.FRONTEND_URL || true
+      : true,
+  })
+);
 app.use(express.json());
 
 function readLeads() {
@@ -23,22 +33,51 @@ function writeLeads(leads) {
   fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2));
 }
 
-// GET all leads
+// --- Gmail OAuth (Day 2) ---
+app.use('/api/auth', gmailAuthRoutes);
+app.get('/api/gmail/status', async (req, res) => {
+  const gmailAuth = require('./services/gmailAuth');
+  res.json(await gmailAuth.getStatus());
+});
+app.post('/api/gmail/disconnect', (req, res) => {
+  const gmailAuth = require('./services/gmailAuth');
+  gmailAuth.deleteTokens();
+  res.json({ message: 'Gmail disconnected' });
+});
+
+// --- Email & Presentation (Day 3) ---
+app.use('/api/email', emailRoutes);
+
+// --- Leads (Day 1) ---
 app.get('/api/leads', (req, res) => {
   res.json(readLeads());
 });
 
-// POST import CSV (raw text in body for Day 1 simplicity)
+// Day 5 — Export leads as CSV
+app.get('/api/leads/export', (req, res) => {
+  const leads = readLeads();
+  const headers = ['company_name', 'contact_name', 'email', 'phone', 'source', 'notes', 'email_status', 'last_emailed_at'];
+  const rows = leads.map((l) =>
+    headers
+      .map((h) => `\"${String(l[h] ?? '').replace(/\"/g, '\"\"')}\"`)
+      .join(',')
+  );
+  const csv = [headers.join(','), ...rows].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=leads-export.csv');
+  res.send(csv);
+});
+
 app.post('/api/leads/import', (req, res) => {
   const { csvText } = req.body;
   if (!csvText) return res.status(400).json({ error: 'csvText required' });
 
-  const lines = csvText.trim().split('\n');
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const lines = csvText.trim().split(/\r?\n/);
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\r/g, ''));
 
   const leads = [];
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',').map((c) => c.trim());
+    const cols = lines[i].split(',').map((c) => c.trim().replace(/\r/g, ''));
     if (cols.length < 3) continue;
     const row = {};
     headers.forEach((h, idx) => (row[h] = cols[idx] || ''));
@@ -71,4 +110,27 @@ app.post('/api/leads/import', (req, res) => {
   res.json({ message: `Added ${added} leads`, total: merged.length });
 });
 
-app.listen(PORT, () => console.log(`Backend http://localhost:${PORT}`));
+// Production: serve React build from same server (one public URL)
+if (isProd) {
+  if (!fs.existsSync(FRONTEND_DIST)) {
+    console.warn('Warning: frontend/dist not found. Run: npm run build (from project root)');
+  } else {
+    app.use(express.static(FRONTEND_DIST));
+    app.get(/^(?!\/api).*/, (req, res) => {
+      res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+    });
+  }
+}
+
+app.listen(PORT, () => {
+  const publicUrl = process.env.PUBLIC_URL || process.env.FRONTEND_URL;
+  console.log(`Server listening on port ${PORT}`);
+  if (isProd && publicUrl) {
+    console.log(`Live site: ${publicUrl}`);
+  } else if (!isProd) {
+    console.log(`Local API: http://localhost:${PORT}`);
+    console.log(`Local UI:  http://localhost:3001 (npm run dev:frontend)`);
+  }
+  const configured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  console.log(`Gmail OAuth: ${configured ? 'configured' : 'NOT configured — see docs/DEPLOY.md'}`);
+});

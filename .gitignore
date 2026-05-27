@@ -1,0 +1,6 @@
+node_modules/
+backend/.env
+data/gmail-tokens.json
+data/campaign-log.json
+dist/
+.DS_Store
