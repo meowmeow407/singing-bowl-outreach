@@ -4,7 +4,6 @@ const emailService = require('./email');
 
 const LOG_PATH = path.join(__dirname, '..', '..', 'data', 'campaign-log.json');
 const LEADS_PATH = path.join(__dirname, '..', '..', 'data', 'leads.json');
-const PDF_PATH = path.join(__dirname, '..', '..', 'data', 'presentation.pdf');
 
 const DELAY_MS = parseInt(process.env.CAMPAIGN_DELAY_MS || '4000', 10);
 const MAX_PER_RUN = parseInt(process.env.CAMPAIGN_MAX_PER_RUN || '10', 10);
@@ -50,9 +49,17 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function runCampaign({ oauth2Client, leadIds, subject, body, skipAlreadySent }) {
-  if (!fs.existsSync(PDF_PATH)) {
-    throw new Error('Upload presentation.pdf first.');
+async function runCampaign({
+  oauth2Client,
+  leadIds,
+  subject,
+  body,
+  skipAlreadySent,
+  attachmentPath,
+  attachmentFilename,
+}) {
+  if (!attachmentPath || !fs.existsSync(attachmentPath)) {
+    throw new Error('Upload a PDF and set it active first.');
   }
 
   const allLeads = readLeads();
@@ -99,8 +106,8 @@ async function runCampaign({ oauth2Client, leadIds, subject, body, skipAlreadySe
         to: lead.email,
         subject: subj,
         htmlBody: html,
-        attachmentPath: PDF_PATH,
-        attachmentFilename: 'presentation.pdf',
+        attachmentPath,
+        attachmentFilename: attachmentFilename || 'presentation.pdf',
       });
 
       entry.status = 'sent';

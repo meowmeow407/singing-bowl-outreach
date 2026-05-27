@@ -5,10 +5,10 @@ const fs = require('fs');
 const gmailAuth = require('../services/gmailAuth');
 const emailService = require('../services/email');
 const campaignService = require('../services/campaign');
+const presentations = require('../services/presentations');
 
 const router = express.Router();
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const PDF_PATH = path.join(DATA_DIR, 'presentation.pdf');
+const DATA_DIR = presentations.DATA_DIR;
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
     cb(null, DATA_DIR);
   },
   filename: (req, file, cb) => {
-    cb(null, 'presentation.pdf');
+    cb(null, presentations.buildStoredFilename(file.originalname));
   }
 });
 
@@ -41,10 +41,12 @@ router.post('/upload-presentation', upload.single('presentation'), (req, res) =>
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded or file is not a PDF' });
   }
+  const { item } = presentations.addPresentation(req.file);
+  const status = presentations.getStatus();
   res.json({
     message: 'Presentation PDF uploaded successfully',
-    filename: 'presentation.pdf',
-    sizeBytes: req.file.size
+    uploadedFile: item,
+    ...status
   });
 }, (error, req, res, next) => {
   // Catch multer / filter errors and return 400
@@ -54,20 +56,24 @@ router.post('/upload-presentation', upload.single('presentation'), (req, res) =>
 // Endpoint to get presentation upload status
 router.get('/presentation-status', (req, res) => {
   try {
-    if (fs.existsSync(PDF_PATH)) {
-      const stats = fs.statSync(PDF_PATH);
-      res.json({
-        uploaded: true,
-        filename: 'presentation.pdf',
-        sizeBytes: stats.size,
-        uploadedAt: stats.mtime
-      });
-    } else {
-      res.json({ uploaded: false });
-    }
+    res.json(presentations.getStatus());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+router.post('/presentation/active', (req, res) => {
+  const { filename } = req.body;
+  if (!filename) return res.status(400).json({ error: 'filename is required' });
+  const result = presentations.setActive(filename);
+  if (!result.ok) return res.status(404).json({ error: result.error });
+  res.json({ message: 'Active PDF updated', ...presentations.getStatus() });
+});
+
+router.delete('/presentation/:filename', (req, res) => {
+  const result = presentations.removePresentation(req.params.filename);
+  if (!result.ok) return res.status(404).json({ error: result.error });
+  res.json({ message: 'PDF removed', ...presentations.getStatus() });
 });
 
 // Endpoint to send test email to self
@@ -90,9 +96,9 @@ router.post('/send-test', async (req, res) => {
   }
   const myEmail = status.email;
 
-  // Check if PDF file exists
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(400).json({ error: 'No presentation PDF found. Please upload a PDF first.' });
+  const activePresentation = presentations.getActivePresentation();
+  if (!activePresentation) {
+    return res.status(400).json({ error: 'No active PDF found. Upload and set one active first.' });
   }
 
   try {
@@ -100,8 +106,8 @@ router.post('/send-test', async (req, res) => {
       to: myEmail,
       subject: subject,
       htmlBody: body,
-      attachmentPath: PDF_PATH,
-      attachmentFilename: 'presentation.pdf'
+      attachmentPath: activePresentation.path,
+      attachmentFilename: activePresentation.filename,
     });
 
     res.json({
@@ -133,12 +139,18 @@ router.post('/send-campaign', async (req, res) => {
   }
 
   try {
+    const activePresentation = presentations.getActivePresentation();
+    if (!activePresentation) {
+      return res.status(400).json({ error: 'No active PDF found. Upload and set one active first.' });
+    }
     const result = await campaignService.runCampaign({
       oauth2Client,
       leadIds,
       subject,
       body,
       skipAlreadySent,
+      attachmentPath: activePresentation.path,
+      attachmentFilename: activePresentation.filename,
     });
     res.json({
       message: `Campaign finished: ${result.summary.sent} sent, ${result.summary.failed} failed, ${result.summary.skipped} skipped`,

@@ -17,7 +17,14 @@ export default function App() {
   const [gmailStatus, setGmailStatus] = useState({ connected: false, email: null });
 
   // PDF states
-  const [pdfStatus, setPdfStatus] = useState({ uploaded: false, filename: '', sizeBytes: 0, uploadedAt: '' });
+  const [pdfStatus, setPdfStatus] = useState({
+    uploaded: false,
+    filename: '',
+    sizeBytes: 0,
+    uploadedAt: '',
+    activeFile: '',
+    files: [],
+  });
   const [uploadingPdf, setUploadingPdf] = useState(false);
 
   // Email Template states
@@ -126,7 +133,7 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         setTestEmailMsg(data.message || 'PDF uploaded successfully.');
-        fetchPdfStatus();
+        setPdfStatus(data);
       } else {
         setTestEmailError(data.error || 'Failed to upload PDF.');
       }
@@ -134,6 +141,43 @@ export default function App() {
       setTestEmailError('Error uploading file: ' + err.message);
     } finally {
       setUploadingPdf(false);
+    }
+  };
+
+  const handleSetActivePdf = async (storedFilename) => {
+    try {
+      const res = await fetch('/api/email/presentation/active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: storedFilename }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPdfStatus(data);
+        setTestEmailMsg('Active PDF updated.');
+      } else {
+        setTestEmailError(data.error || 'Failed to update active PDF.');
+      }
+    } catch (err) {
+      setTestEmailError('Error setting active PDF: ' + err.message);
+    }
+  };
+
+  const handleDeletePdf = async (storedFilename) => {
+    if (!window.confirm('Remove this PDF from the server?')) return;
+    try {
+      const res = await fetch(`/api/email/presentation/${encodeURIComponent(storedFilename)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPdfStatus(data);
+        setTestEmailMsg('PDF removed.');
+      } else {
+        setTestEmailError(data.error || 'Failed to remove PDF.');
+      }
+    } catch (err) {
+      setTestEmailError('Error deleting PDF: ' + err.message);
     }
   };
 
@@ -246,7 +290,7 @@ export default function App() {
                 <span>📄</span> PDF Catalog Upload
               </h2>
               <p className="card-description">
-                Upload your outreach materials (PDF format, max 10MB). This catalog will be attached to your sales pitches.
+                Upload outreach PDFs, choose which one is active for sending, and remove old files.
               </p>
 
               <div className="upload-zone" onClick={() => document.getElementById('pdf-file-input').click()}>
@@ -258,7 +302,7 @@ export default function App() {
                   style={{ display: 'none' }}
                 />
                 <p className="upload-zone-text">
-                  {uploadingPdf ? 'Uploading to server...' : 'Drag & drop or click to choose presentation.pdf'}
+                  {uploadingPdf ? 'Uploading to server...' : 'Drag & drop or click to add a PDF'}
                 </p>
                 
                 {pdfStatus.uploaded ? (
@@ -275,6 +319,61 @@ export default function App() {
                 <p style={{ fontSize: 12, color: 'var(--text)', marginTop: 8 }}>
                   Last uploaded: {new Date(pdfStatus.uploadedAt).toLocaleString()}
                 </p>
+              )}
+
+              {pdfStatus.files?.length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text)', marginBottom: 8 }}>
+                    Uploaded PDFs ({pdfStatus.files.length})
+                  </p>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {pdfStatus.files.map((f) => {
+                      const isActive = pdfStatus.activeFile === f.filename;
+                      return (
+                        <div
+                          key={f.filename}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                            border: '1px solid var(--border)',
+                            borderRadius: 8,
+                            padding: '8px 10px',
+                            background: isActive ? 'var(--accent-bg)' : 'var(--bg)',
+                          }}
+                        >
+                          <div style={{ fontSize: 12 }}>
+                            <div style={{ fontWeight: 600 }}>{f.originalName}</div>
+                            <div style={{ color: 'var(--text)' }}>
+                              {(f.sizeBytes / 1024).toFixed(1)} KB · {new Date(f.uploadedAt).toLocaleString()}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {!isActive && (
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                style={{ padding: '6px 10px' }}
+                                onClick={() => handleSetActivePdf(f.filename)}
+                              >
+                                Set active
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 10px' }}
+                              onClick={() => handleDeletePdf(f.filename)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </section>
 
