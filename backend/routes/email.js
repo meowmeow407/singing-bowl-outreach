@@ -102,18 +102,38 @@ router.post('/send-test', async (req, res) => {
   }
 
   try {
-    const result = await emailService.sendGmailMessage(oauth2Client, {
+    // 1. Send the letter (no attachment)
+    const result1 = await emailService.sendGmailMessage(oauth2Client, {
       to: myEmail,
       subject: subject,
       htmlBody: body,
+      attachmentPath: null,
+      attachmentFilename: null,
+    });
+
+    // 2. Wait 2 seconds
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // 3. Send the PDF catalog follow-up (with attachment)
+    const followUpSubject = `Catalog attachment — ${subject}`;
+    const followUpBody = `
+      <p>Hi there,</p>
+      <p>Following up on my previous message, I have attached our wholesale catalog and pricing brochure (<strong>${activePresentation.filename}</strong>) to this email for your review.</p>
+      <p>Best regards,<br/>Singing Bowl Team</p>
+    `;
+
+    const result2 = await emailService.sendGmailMessage(oauth2Client, {
+      to: myEmail,
+      subject: followUpSubject,
+      htmlBody: followUpBody,
       attachmentPath: activePresentation.path,
       attachmentFilename: activePresentation.filename,
     });
 
     res.json({
       success: true,
-      message: 'Test email sent successfully to ' + myEmail,
-      messageId: result.id,
+      message: 'Test email and PDF attachment follow-up sent successfully to ' + myEmail,
+      messageId: `${result1.id};${result2.id}`,
       recipient: myEmail
     });
   } catch (e) {

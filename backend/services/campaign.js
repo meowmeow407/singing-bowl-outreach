@@ -102,16 +102,38 @@ async function runCampaign({
     try {
       const html = formatBodyHtml(personalize(body, lead));
       const subj = personalize(subject, lead);
-      const sendResult = await emailService.sendGmailMessage(oauth2Client, {
+
+      // 1. Send the intro letter (no attachment)
+      const sendResult1 = await emailService.sendGmailMessage(oauth2Client, {
         to: lead.email,
         subject: subj,
         htmlBody: html,
+        attachmentPath: null,
+        attachmentFilename: null,
+      });
+
+      // 2. Wait 2 seconds
+      await sleep(2000);
+
+      // 3. Send the PDF attachment follow-up
+      const followUpSubject = `Catalog attachment — ${subj}`;
+      const name = lead.contact_name || 'there';
+      const followUpBody = `
+        <p>Hi ${name},</p>
+        <p>Following up on my previous message, I have attached our wholesale catalog and pricing brochure (<strong>${attachmentFilename || 'presentation.pdf'}</strong>) to this email for your review.</p>
+        <p>Best regards,<br/>Singing Bowl Team</p>
+      `;
+
+      const sendResult2 = await emailService.sendGmailMessage(oauth2Client, {
+        to: lead.email,
+        subject: followUpSubject,
+        htmlBody: followUpBody,
         attachmentPath,
         attachmentFilename: attachmentFilename || 'presentation.pdf',
       });
 
       entry.status = 'sent';
-      entry.message_id = sendResult.id;
+      entry.message_id = `${sendResult1.id};${sendResult2.id}`;
       sentEmails.add(lead.email.toLowerCase());
 
       const leads = readLeads();
