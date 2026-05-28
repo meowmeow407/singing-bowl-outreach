@@ -7,6 +7,11 @@
     "build": "npm install --prefix frontend --include=dev && npm run build --prefix frontend && npm install --prefix backend --include=dev",
     "start": "npm start --prefix backend",
     "dev:backend": "npm start --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend"
+    "dev:frontend": "npm run dev --prefix frontend",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.95.0"
   }
 }

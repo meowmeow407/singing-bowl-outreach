@@ -4,3 +4,10 @@ data/gmail-tokens.json
 data/campaign-log.json
 dist/
 .DS_Store
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
